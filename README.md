@@ -14,20 +14,42 @@ if you want it.
 ## The workflow
 
 1. **Fill the ticket context once** at the top (ticket number, caller, phone /
-   contact number, short description, your initials). Every `{{placeholder}}`
-   in every template updates live as you type.
+   contact number, short description, **KB# quick entry**, your initials).
+   Every `{{placeholder}}` in every template updates live as you type.
 2. **Pick blocks** from the Library on the left:
-   - **Notes** — work notes / close-note templates
+   - **Notes** — templates with a Short description, Description and Work notes
    - **KB** — KB numbers you reference (several can be stacked; they render as
      a `KB Articles:` list, and `{{kb}}` inserts the numbers anywhere)
    - **Email** — subject + body replies you send often
    - **Kits** — saved one-click stacks (see below)
 3. **Rearrange / edit** blocks in the middle. Add free-form "Quick text" when
    something is ticket-specific.
-4. **Copy notes** (`Ctrl/⌘ + Enter`) → paste straight into ServiceNow Work
-   notes / Additional comments, or into your mail client.
+4. **Copy each ServiceNow field** from the preview panel — it shows
+   **Short description**, **Description** and **Work notes** separately, each
+   with its own Copy button. The main **Copy work notes** button
+   (`Ctrl/⌘ + Enter`) copies everything (templates + KB list + emails).
 5. **Copy & next** (`Ctrl/⌘ + Shift + Enter`) copies, logs the note to History,
    and clears the context so you're instantly ready for the next ticket.
+
+### ServiceNow fields
+
+Every **note template** now has three text areas, one per ServiceNow field:
+
+| Field | Editor label | Copy button |
+| --- | --- | --- |
+| Short description | `Short description` | `Copy` above the preview |
+| Description | `Description` | `Copy` above the preview |
+| Work notes | `Work notes` | the main `Copy work notes` button |
+
+All three are optional — leave any blank. They all accept the same variables.
+Header/footer templates and KB/email/quick-text blocks apply to **Work notes**
+only. The starter examples are filled in for all three fields.
+
+**KB# quick entry** — type any KB number (or several, comma-separated) straight
+into Ticket context without adding it to the KB library. It becomes
+`{{kbnum}}`, is merged into `{{kb}}` / `{{kblist}}`, and is appended to Work
+notes as a `KB#: …` line if no template already includes it. So a template
+containing `KB: {{kb|N/A}}` picks it up automatically.
 
 ### Efficiency features
 
@@ -48,7 +70,7 @@ if you want it.
 | --- | --- |
 | `Ctrl/⌘ + K` | Command palette — **selecting an item copies it to the clipboard** |
 | `Ctrl/⌘ + K` then `Shift + Enter` / `Shift + click` | Add that item to the stack instead of copying |
-| `Ctrl/⌘ + Enter` | Copy the whole composed note |
+| `Ctrl/⌘ + Enter` | Copy the composed Work notes |
 | `Ctrl/⌘ + Shift + Enter` | Copy & start next ticket |
 | `/` | Focus library search |
 | `?` | Shortcuts guide |
@@ -57,15 +79,17 @@ if you want it.
 > **Palette behaviour** is set in **Settings → Workflow**: `Copy to clipboard`
 > (default), `Add to stack`, or `Copy AND add to stack`. Shift always does the
 > opposite action. Selecting a **Quick Kit** copies the fully composed note
-> from all of its blocks. Copying a template/email/KB fills variables from the
-> current Ticket context first, so `{{ticket}}` and `{{kb}}` are ready to paste.
+> from all of its blocks. Quick copies (`Ctrl/⌘ K` or the `⧉` button in the
+> library) copy a template's **Work notes** — use the preview panel's dedicated
+> buttons for Short description and Description. All variables are filled from
+> the current Ticket context first, so `{{ticket}}` and `{{kb}}` are ready.
 
 ### Built-in variables
 
-`{{ticket}}` `{{caller}}` `{{phone}}` `{{shortdesc}}` `{{date}}` `{{time}}`
-`{{datetime}}` `{{agent}}` `{{kb}}` (comma-separated KB numbers) `{{kblist}}`
-(full KB block). KB line formats additionally accept `{{number}}` `{{title}}`
-`{{url}}` `{{notes}}`.
+`{{ticket}}` `{{caller}}` `{{phone}}` `{{shortdesc}}` `{{kbnum}}` `{{date}}`
+`{{time}}` `{{datetime}}` `{{agent}}` `{{kb}}` (comma-separated KB numbers,
+library + quick-entry) `{{kblist}}` (full KB block). KB line formats
+additionally accept `{{number}}` `{{title}}` `{{url}}` `{{notes}}`.
 
 `{{phone}}` comes from the **Phone / contact number** field in Ticket context.
 It's optional — if a template doesn't use it, just leave the field blank. Use

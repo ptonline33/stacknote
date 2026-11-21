@@ -3,7 +3,7 @@
 import {
   STORAGE_KEY, BUILTIN_VARS, BUILTIN_VAR_HELP, DEFAULT_SETTINGS,
   uid, esc, clone, fmtStamp, todayCount, loadState, saveState,
-  normalizeState, findItem, touchUsage, seedState
+  normalizeState, findItem, touchUsage, seedState, SECTION_LABELS
 } from './data.js';
 import {
   compose, buildVars, resolve, detectFields, renderBlock, collectKB,
@@ -96,21 +96,27 @@ function itemTag(kind, it) {
 }
 
 function itemSub(kind, it) {
-  if (kind === 'template') return firstLine(it.body);
+  if (kind === 'template') return firstLine(it.shortDescription || it.description || it.body);
   if (kind === 'kb') return firstLine(it.notes || it.url || '');
   if (kind === 'email') return `Subject: ${firstLine(it.subject)}`;
   return (it.blocks || []).map((b) => blockTitle(state, b)).join(' · ') || 'Empty kit';
 }
 
 function bodyPreview(kind, it) {
-  if (kind === 'template') return it.body || '';
+  if (kind === 'template') {
+    return [
+      it.shortDescription ? `Short description: ${it.shortDescription}` : '',
+      it.description ? `Description: ${it.description}` : '',
+      it.body ? `Work notes: ${it.body}` : ''
+    ].filter(Boolean).join('\n\n') || '(empty)';
+  }
   if (kind === 'kb') return `${it.url || ''}\n${it.notes || ''}`.trim();
   return `Subject: ${it.subject || ''}\n\n${it.body || ''}`.trim();
 }
 
 function searchable(kind, it) {
-  return [it.name, it.number, it.title, it.category, it.subject, it.body, it.notes, it.url]
-    .filter(Boolean).join(' ');
+  return [it.name, it.number, it.title, it.category, it.shortDescription, it.description,
+    it.subject, it.body, it.notes, it.url].filter(Boolean).join(' ');
 }
 
 function sortedItems(kind, search = ui.libSearch) {
@@ -230,10 +236,15 @@ function renderContext(fields) {
           <input class="input" id="ctx-sd" data-context="shortdesc" value="${esc(c.shortdesc || '')}" placeholder="Cannot sign in to VPN" autocomplete="off">
         </div>
         <div class="field">
+          <label for="ctx-kbnum">KB# quick entry <span class="muted">({{kbnum}} / {{kb}})</span></label>
+          <input class="input" id="ctx-kbnum" data-context="kbnum" value="${esc(c.kbnum || '')}" placeholder="KB0012345, KB0099888" autocomplete="off">
+        </div>
+        <div class="field">
           <label for="ctx-agent">Your name / initials</label>
           <input class="input" id="ctx-agent" data-setting="agent" value="${esc(state.settings.agent || '')}" placeholder="e.g. A. Patel" autocomplete="off">
         </div>
       </div>
+      <div class="hint" style="padding:0 14px 8px">✦ A <b>KB#</b> typed above is merged into <code>{{kb}}</code> / <code>{{kbnum}}</code> and appended to Work notes if no template already includes it.</div>
       ${extras}
       ${fields.length ? '<div class="hint" style="padding:0 14px 12px">✦ Custom fields above were detected automatically from the templates in your stack.</div>' : ''}
       ` : ''}
@@ -365,7 +376,22 @@ function previewWarn(composed) {
   return `<div class="preview-warn"><span>⚠</span><span><b>${composed.unfilled.length} field${composed.unfilled.length === 1 ? '' : 's'} not filled:</b> ${esc(names)}. Fill them in Ticket context above, or give the template a default like <code>{{ticket|N/A}}</code>.</span></div>`;
 }
 
+const SECTION_PLACEHOLDER = '<span class="muted">No text for this field yet — add a note template that fills it.</span>';
+
+function snFieldRow(key, label, text) {
+  const value = String(text || '');
+  return `
+    <div class="sn-field">
+      <div class="sn-field-head">
+        <span class="sn-label">${esc(label)}</span>
+        <button class="btn btn-sm" data-action="copy-field" data-field="${key}" ${value.trim() ? '' : 'disabled'} title="Copy just this ServiceNow field">${COPY_SVG} Copy</button>
+      </div>
+      <div class="sn-field-preview" id="sn-${key}" title="${esc(value.slice(0, 400))}">${value.trim() ? highlight(value) : SECTION_PLACEHOLDER}</div>
+    </div>`;
+}
+
 function renderPreviewPanel(composed) {
+  const sections = composed.sections || {};
   return `
     <div class="panel" data-panel="preview">
       <div class="panel-head">
@@ -373,14 +399,19 @@ function renderPreviewPanel(composed) {
         <div class="panel-actions"><span class="chip">${MOD} ↵</span></div>
       </div>
       <div class="panel-body">
-        <div class="preview-box" id="preview-box">${highlight(composed.text)}</div>
+        ${snFieldRow('shortDescription', 'Short description', sections.shortDescription)}
+        ${snFieldRow('description', 'Description', sections.description)}
+        <div class="sn-field">
+          <div class="sn-field-head"><span class="sn-label">Work notes</span><span class="muted small">main copy · ${MOD} ↵</span></div>
+          <div class="preview-box" id="preview-box">${highlight(composed.text)}</div>
+        </div>
         <div class="preview-stats" id="preview-stats">${composed.text ? previewStats(composed) : 'Nothing yet — add a block on the left.'}</div>
         <div id="preview-warn">${previewWarn(composed)}</div>
         <div class="copy-actions">
-          <button class="btn btn-primary btn-lg" data-action="copy">${COPY_SVG} Copy notes</button>
+          <button class="btn btn-primary btn-lg" data-action="copy">${COPY_SVG} Copy work notes</button>
           <button class="btn btn-lg" data-action="copy-next" title="Copy and reset for the next ticket">Copy &amp; next →</button>
         </div>
-        <div class="hint" style="margin-top:10px">Paste straight into ServiceNow <b>Work notes</b> / <b>Additional comments</b> — or into your email client. Nothing leaves this browser unless you enable cloud sync.</div>
+        <div class="hint" style="margin-top:10px">Each field has its own <b>Copy</b> button above. Paste into the matching ServiceNow field: <b>Short description</b>, <b>Description</b>, <b>Work notes</b>. Nothing leaves this browser unless you enable cloud sync.</div>
       </div>
     </div>`;
 }
@@ -612,7 +643,9 @@ function renderSettings() {
           </div>
         </div>
         <p class="hint" style="margin-top:8px">KB lines accept <code>{{number}}</code>, <code>{{title}}</code>, <code>{{url}}</code>, <code>{{notes}}</code>. Anywhere else use:</p>
-        <div class="var-chips">${varChips}</div>`)}
+        <div class="var-chips">${varChips}</div>
+        <hr class="divider">
+        <p class="hint">Each <b>note template</b> has three ServiceNow fields — <b>Short description</b>, <b>Description</b> and <b>Work notes</b> — each with its own Copy button in the preview. Header / footer above apply to Work notes only. A <b>KB#</b> typed into Ticket context is merged into <code>{{kb}}</code> and appended to Work notes if no template already includes it.</p>`)}
 
       ${settingPanel('Workflow', `
         <label class="checkbox"><input type="checkbox" data-setting="autoClear" ${s.autoClear ? 'checked' : ''}> Clear the stack after a normal copy</label>
@@ -706,7 +739,7 @@ function renderMobileCopybar() {
   const composed = compose(state);
   bar.innerHTML = `
     <span class="m-count">${state.stack.length} blocks · ${composed.text.length} chars</span>
-    <button class="btn btn-primary" data-action="copy">${COPY_SVG} Copy notes</button>
+    <button class="btn btn-primary" data-action="copy">${COPY_SVG} Copy work notes</button>
     <button class="btn" data-action="set-mobile-view" data-view="preview">Preview</button>`;
 }
 
@@ -718,6 +751,16 @@ function updateLive() {
   if (stats) stats.textContent = composed.text ? previewStats(composed) : 'Nothing yet — add a block on the left.';
   const warn = $('#preview-warn');
   if (warn) warn.innerHTML = previewWarn(composed);
+  for (const key of ['shortDescription', 'description']) {
+    const value = composed.sections?.[key] || '';
+    const el = document.getElementById('sn-' + key);
+    if (el) {
+      el.innerHTML = value.trim() ? highlight(value) : SECTION_PLACEHOLDER;
+      el.title = value.slice(0, 400);
+    }
+    const btn = document.querySelector(`[data-action="copy-field"][data-field="${key}"]`);
+    if (btn) btn.disabled = !value.trim();
+  }
   document.querySelectorAll('[data-snippet]').forEach((el) => {
     const b = (state.stack || []).find((x) => x.id === el.dataset.snippet);
     if (b) el.textContent = blockSnippet(state, b, composed.vars) || '(empty)';
@@ -835,9 +878,14 @@ function editorFields(kind, it) {
       <div class="field"><label for="ed-name">Name</label><input class="input" id="ed-name" value="${v('name')}" placeholder="e.g. Password reset" autofocus></div>
       <div class="field"><label for="ed-category">Category</label><input class="input" id="ed-category" value="${v('category', 'General')}" placeholder="Access / Hardware / …"></div>
     </div>
-    <div class="field"><label for="ed-body">Note body</label>
-      <textarea class="textarea tall" id="ed-body" placeholder="Write the work notes…">${v('body')}</textarea>
-      ${varButtons('ed-body')}</div>`;
+    <div class="field"><label for="ed-short">Short description <span class="muted">(ServiceNow field — one line)</span></label>
+      <textarea class="textarea" id="ed-short" placeholder="e.g. Password reset for {{caller}}">${v('shortDescription')}</textarea></div>
+    <div class="field"><label for="ed-desc">Description <span class="muted">(ServiceNow field — what the user reported)</span></label>
+      <textarea class="textarea" id="ed-desc" placeholder="e.g. {{caller}} reported being unable to sign in…">${v('description')}</textarea></div>
+    <div class="field"><label for="ed-body">Work notes <span class="muted">(the main note you paste into the ticket)</span></label>
+      <textarea class="textarea tall" id="ed-body" placeholder="Write the work notes…">${v('body')}</textarea></div>
+    ${varButtons('ed-body')}
+    <p class="hint" style="margin-top:-4px">Click into any of the three fields above first, then click a variable to insert it at the cursor. All three are optional — leave a field blank if that ticket type doesn't need it.</p>`;
   if (kind === 'kb') return `
     <div class="form-row">
       <div class="field"><label for="ed-number">KB number</label><input class="input" id="ed-number" value="${v('number')}" placeholder="KB0012345" autofocus></div>
@@ -887,7 +935,15 @@ function saveEditor(kind, id) {
   if (kind === 'template') {
     const name = val('#ed-name').trim() || 'Untitled template';
     if (!item) { item = { id: uid('tpl'), uses: 0, updatedAt: now }; list.unshift(item); }
-    Object.assign(item, { name, category: val('#ed-category').trim() || 'General', body: val('#ed-body'), favorite: fav, updatedAt: now });
+    Object.assign(item, {
+      name,
+      category: val('#ed-category').trim() || 'General',
+      shortDescription: val('#ed-short'),
+      description: val('#ed-desc'),
+      body: val('#ed-body'),
+      favorite: fav,
+      updatedAt: now
+    });
   } else if (kind === 'kb') {
     const number = val('#ed-number').trim() || 'KB?';
     const name = val('#ed-name').trim() || 'Untitled article';
@@ -913,6 +969,8 @@ function showShortcuts() {
       <p class="hint" style="margin:0 0 12px">Type a few letters of any template, KB number, email, kit or action and hit Enter — the item's content is <b>copied to your clipboard immediately</b>, with variables already filled. Hold <b>Shift</b> while selecting to add it to the stack instead. Change this in Settings → Workflow.</p>
       <div class="shortcut-row"><span><b>Quick Kits</b> — one click for a whole ticket type</span></div>
       <p class="hint" style="margin:0 0 12px">Save a stack (e.g. Password reset + KB + confirmation email) as a Kit, then load it instantly.</p>
+      <div class="shortcut-row"><span><b>ServiceNow fields</b> — one template, three copy buttons</span></div>
+      <p class="hint" style="margin:0 0 12px">Every note template can fill <b>Short description</b>, <b>Description</b> and <b>Work notes</b>. The preview has a Copy button for each, plus <code>{{kbnum}}</code> / <code>{{kb}}</code> for a KB# typed into Ticket context.</p>
       <div class="shortcut-row"><span><b>Smart variables</b></span></div>
       <p class="hint" style="margin:0 0 12px">Use <code>{{ticket}}</code>, <code>{{caller}}</code>, <code>{{kb}}</code> — and any custom placeholder you invent. Unknown ones become input fields automatically. Add <code>|default</code> as a fallback.</p>
       <div class="shortcut-row"><span><b>Copy &amp; next</b></span><span class="spacer"></span><span class="kbd">${MOD} ⇧ ↵</span></div>
@@ -953,7 +1011,7 @@ function paletteItems() {
   }
   if (p.mode === 'all') {
     for (const k of state.kits) add('Quick Kits', '⚡', k.name, `${(k.blocks || []).length} blocks`, { type: 'load-kit', id: k.id });
-    add('Actions', '⧉', 'Copy notes', `${MOD} ↵`, { type: 'action', action: 'copy' });
+    add('Actions', '⧉', 'Copy work notes', `${MOD} ↵`, { type: 'action', action: 'copy' });
     add('Actions', '→', 'Copy & start next ticket', `${MOD} ⇧ ↵`, { type: 'action', action: 'copy-next' });
     add('Actions', '+', 'Add quick text', 'Free-form block', { type: 'action', action: 'add-text' });
     add('Actions', '⚡', 'Save current stack as Kit', 'One-click workflow', { type: 'action', action: 'save-kit' });
@@ -1179,7 +1237,7 @@ async function doCopy(next = false) {
   if (next) {
     state.stack = [];
     if (state.settings.resetFieldsOnNext !== false) {
-      state.context = { ticket: '', caller: '', phone: '', shortdesc: '' };
+      state.context = { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' };
       state.fields = {};
     }
     toast('Copied — ready for the next ticket ✓', 'ok');
@@ -1288,7 +1346,7 @@ async function handleAction(action, d, el, opts = {}) {
       break;
     case 'context-toggle': ui.contextOpen = !ui.contextOpen; renderView(); break;
     case 'new-ticket':
-      state.context = { ticket: '', caller: '', phone: '', shortdesc: '' };
+      state.context = { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' };
       state.fields = {};
       save(); renderView(); toast('Cleared for a new ticket');
       break;
@@ -1345,6 +1403,15 @@ async function handleAction(action, d, el, opts = {}) {
       break;
     case 'copy': await doCopy(false); break;
     case 'copy-next': await doCopy(true); break;
+    case 'copy-field': {
+      const composed = compose(state);
+      const key = d.field;
+      const text = composed.sections?.[key] || '';
+      if (!text.trim()) { toast('Nothing to copy for that field yet.', 'err'); break; }
+      const ok = await copyText(text);
+      toast(ok ? `Copied ${SECTION_LABELS[key] || key} ✓` : 'Clipboard was blocked by the browser.', ok ? 'ok' : 'err');
+      break;
+    }
 
     case 'fav': {
       const it = findItem(state, d.kind, d.id);
@@ -1464,7 +1531,11 @@ async function handleAction(action, d, el, opts = {}) {
       break;
     }
     case 'insert-var': {
-      const ta = $('#' + d.target) || ui.lastTextarea;
+      const modal = $('#modal-root');
+      // Insert into whichever editor field the user last focused.
+      let ta = ui.lastTextarea;
+      if (!ta || ta.tagName !== 'TEXTAREA' || !modal.contains(ta)) ta = null;
+      if (!ta) ta = $('#' + d.target) || modal.querySelector('textarea');
       if (ta) {
         const start = ta.selectionStart ?? ta.value.length;
         const end = ta.selectionEnd ?? start;

@@ -6,7 +6,26 @@ const KB_LINE_KEYS = ['number', 'title', 'url', 'notes'];
 
 // Built-in derived values are legitimately empty sometimes (no KB articles yet,
 // no agent name configured). Don't flag them as missing fields.
-const SILENT_WHEN_EMPTY = new Set(['kb', 'kblist', 'agent', 'date', 'time', 'datetime']);
+const SILENT_WHEN_EMPTY = new Set([
+  'kb', 'kblist', 'kbnum', 'agent', 'date', 'time', 'datetime'
+]);
+
+/** KB numbers typed into the quick-entry field (comma / space / semicolon separated). */
+export function typedKBNumbers(state) {
+  const raw = String(state.context?.kbnum || '');
+  return [...new Set(raw.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean))];
+}
+
+/** Render a bare KB number through the configured KB line format. */
+function typedKBLine(state, num, vars) {
+  const format = state.settings?.kbFormat || '• {{number}} — {{title}}';
+  let line = resolve(format, {
+    ...vars, number: num, title: '', url: '', notes: ''
+  }, new Set(), true).trim();
+  line = line.replace(/\(\s*\)/g, '').replace(/\[\s*\]/g, '');
+  line = line.replace(/[\s—–\-:|,]+$/g, '').trim();
+  return line || num;
+}
 
 /** Replace {{key}} / {{key|fallback}} tokens. Missing values are recorded. */
 export function resolve(text, vars, unfilled = new Set(), silent = false) {
@@ -51,6 +70,7 @@ export function buildVars(state) {
   }
 
   const kbItems = collectKB(state);
+  const typed = typedKBNumbers(state);
   const format = settings.kbFormat || '• {{number}} — {{title}}';
   const lines = kbItems.map((k) =>
     resolve(format, {
@@ -58,8 +78,12 @@ export function buildVars(state) {
       number: k.number || '', title: k.title || '', url: k.url || '', notes: k.notes || ''
     }, new Set(), true).trim()
   );
+  for (const num of typed) lines.push(typedKBLine(state, num, base));
 
-  base.kb = kbItems.map((k) => k.number).filter(Boolean).join(', ');
+  base.kbnum = state.context?.kbnum || '';
+  base.kb = [...new Set([
+    ...kbItems.map((k) => k.number).filter(Boolean), ...typed
+  ])].join(', ');
   base.kblist = lines.join('\n');
   return base;
 }
@@ -75,7 +99,7 @@ export function detectFields(state) {
     if (block.type === 'text') texts.push(block.content);
     else if (block.type === 'template') {
       const t = findItem(state, 'template', block.refId);
-      if (t) texts.push(t.body);
+      if (t) { texts.push(t.shortDescription); texts.push(t.description); texts.push(t.body); }
     } else if (block.type === 'email') {
       const e = findItem(state, 'email', block.refId);
       if (e) { texts.push(e.subject); texts.push(e.body); }
@@ -129,29 +153,56 @@ export function renderBlock(state, block, vars, unfilled) {
   return '';
 }
 
-/** Compose the final note that gets copied to the clipboard. */
+/** Compose the final note plus per-ServiceNow-field sections. */
 export function compose(state) {
   const unfilled = new Set();
   const vars = buildVars(state);
   const settings = state.settings || {};
+  const sep = settings.separator ?? '\n\n';
   const parts = [];
+  const shortParts = [];
+  const descParts = [];
 
   const header = resolve(settings.header || '', vars, unfilled).trim();
   if (header) parts.push(header);
 
   for (const block of state.stack || []) {
+    if (block.type === 'template') {
+      const t = findItem(state, 'template', block.refId);
+      if (t) {
+        const shortText = resolve(t.shortDescription || '', vars, unfilled).trim();
+        if (shortText) shortParts.push(shortText);
+        const description = resolve(t.description || '', vars, unfilled).trim();
+        if (description) descParts.push(description);
+      }
+    }
     const text = renderBlock(state, block, vars, unfilled).trim();
     if (text) parts.push(text);
+  }
+
+  // A KB# typed into Ticket context always reaches the note, even when no
+  // template references {{kb}} and no KB article was stacked.
+  const typed = typedKBNumbers(state);
+  if (typed.length) {
+    const joined = parts.join(sep);
+    const missing = typed.filter((n) => !joined.includes(n));
+    if (missing.length) parts.push(`KB#: ${missing.join(', ')}`);
   }
 
   const footer = resolve(settings.footer || '', vars, unfilled).trim();
   if (footer) parts.push(footer);
 
+  const text = parts.join(sep);
   return {
-    text: parts.join(settings.separator ?? '\n\n'),
+    text,
     parts,
     vars,
-    unfilled: [...unfilled].sort()
+    unfilled: [...unfilled].sort(),
+    sections: {
+      shortDescription: shortParts.join(sep),
+      description: descParts.join(sep),
+      workNotes: text
+    }
   };
 }
 

@@ -3,7 +3,7 @@
 export const STORAGE_KEY = 'stacknote:v1';
 
 export const BUILTIN_VARS = [
-  'ticket', 'caller', 'phone', 'shortdesc', 'date', 'time', 'datetime',
+  'ticket', 'caller', 'phone', 'shortdesc', 'kbnum', 'date', 'time', 'datetime',
   'agent', 'kb', 'kblist'
 ];
 
@@ -12,12 +12,20 @@ export const BUILTIN_VAR_HELP = {
   caller: 'Caller / affected user name',
   phone: 'Caller phone / contact number (Ticket context)',
   shortdesc: 'Short description of the ticket',
+  kbnum: 'KB# typed into the quick-entry field (also merged into {{kb}})',
   date: 'Today\'s date',
   time: 'Current time',
   datetime: 'Date and time',
   agent: 'Your name / initials (Settings)',
-  kb: 'Comma-separated KB numbers in this note',
+  kb: 'Comma-separated KB numbers (library + quick-entry)',
   kblist: 'Full formatted KB list in this note'
+};
+
+/** ServiceNow field labels, shared by the composer and the preview. */
+export const SECTION_LABELS = {
+  shortDescription: 'Short description',
+  description: 'Description',
+  workNotes: 'Work notes'
 };
 
 export function uid(prefix = 'id') {
@@ -79,8 +87,59 @@ export const DEFAULT_SETTINGS = {
   lastSync: null
 };
 
+/**
+ * Starter text for the three ServiceNow fields on each built-in template.
+ * Kept separate so existing users' saved starter templates can be upgraded
+ * in normalizeState() without touching any templates they created themselves.
+ */
+export const SEED_FIELD_EXAMPLES = {
+  'seed-tpl-pwreset': {
+    shortDescription: 'Password reset for {{caller}}',
+    description: '{{caller}} contacted the Service Desk unable to sign in to their account. A password reset was requested for {{ticket}}. Callback number: {{phone|not provided}}.'
+  },
+  'seed-tpl-unlock': {
+    shortDescription: 'Account unlock for {{caller}}',
+    description: "{{caller}}'s account was locked after repeated sign-in failures. The user contacted the Service Desk to request an unlock for {{ticket}}."
+  },
+  'seed-tpl-access': {
+    shortDescription: 'Access request — {{entitlement|role or group}} for {{caller}}',
+    description: '{{caller}} requires {{entitlement|the requested role or group}} to perform their duties. Manager / data-owner approval is required before fulfilment. Ticket {{ticket}}.'
+  },
+  'seed-tpl-laptop': {
+    shortDescription: 'Hardware issue — {{asset|laptop / docking station}} for {{caller}}',
+    description: '{{caller}} reported a problem with {{asset|their device}}. Symptoms and diagnostics are recorded in the work notes. Ticket {{ticket}}; contact {{phone|not provided}}.'
+  },
+  'seed-tpl-software': {
+    shortDescription: '{{app|Application}} install / repair for {{caller}}',
+    description: '{{caller}} needs {{app|the application}} installed or repaired on their device. Ticket {{ticket}}.'
+  },
+  'seed-tpl-vpn': {
+    shortDescription: 'VPN / connectivity issue for {{caller}}',
+    description: '{{caller}} cannot connect to the VPN / internal resources. Reported on {{date}} at {{time}}. Ticket {{ticket}}.'
+  },
+  'seed-tpl-followup': {
+    shortDescription: 'Awaiting information — {{ticket}}',
+    description: 'Additional information is required from {{caller}} to continue investigating {{shortdesc}}. Ticket {{ticket}}; callback {{phone|not provided}}.'
+  },
+  'seed-tpl-resolve': {
+    shortDescription: 'Resolved — {{shortdesc}}',
+    description: '{{shortdesc}} reported by {{caller}} on {{date}}. Resolution details are recorded in the work notes. Ticket {{ticket}}.'
+  },
+  'seed-tpl-escalate': {
+    shortDescription: 'Escalation to {{team|L2}} — {{shortdesc}}',
+    description: '{{ticket}} — {{shortdesc}} requires review by {{team|the specialist team}}. Steps taken and findings are in the work notes. Impact: {{impact|standard}}.'
+  }
+};
+
 function tpl(id, name, category, body, favorite = false) {
-  return { id, name, category, body, favorite, uses: 0, updatedAt: new Date().toISOString() };
+  const ex = SEED_FIELD_EXAMPLES[id] || { shortDescription: '', description: '' };
+  return {
+    id, name, category,
+    shortDescription: ex.shortDescription,
+    description: ex.description,
+    body, // Work notes
+    favorite, uses: 0, updatedAt: new Date().toISOString()
+  };
 }
 
 function kb(id, number, title, url, notes, favorite = false) {
@@ -99,7 +158,7 @@ export function seedState() {
   return {
     v: 1,
     settings: clone(DEFAULT_SETTINGS),
-    context: { ticket: '', caller: '', phone: '', shortdesc: '' },
+    context: { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' },
     fields: {},
     templates: [
       tpl('seed-tpl-pwreset', 'Password reset', 'Access',
@@ -162,7 +221,7 @@ export function normalizeState(raw) {
   const out = {
     v: 1,
     settings: { ...clone(DEFAULT_SETTINGS), ...(raw.settings || {}) },
-    context: { ticket: '', caller: '', phone: '', shortdesc: '', ...(raw.context || {}) },
+    context: { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '', ...(raw.context || {}) },
     fields: (raw.fields && typeof raw.fields === 'object' && !Array.isArray(raw.fields)) ? { ...raw.fields } : {},
     templates: Array.isArray(raw.templates) ? raw.templates : base.templates,
     kb: Array.isArray(raw.kb) ? raw.kb : base.kb,
@@ -174,7 +233,19 @@ export function normalizeState(raw) {
   out.settings.supabase = { url: '', key: '', workspace: '', ...(raw.settings?.supabase || {}) };
   // Basic per-item defaults.
   const fix = (item, defaults) => ({ ...defaults, ...item });
-  out.templates = out.templates.map((t) => fix(t, { name: 'Untitled', category: 'General', body: '', favorite: false, uses: 0, updatedAt: new Date().toISOString() }));
+  out.templates = out.templates.map((t) => {
+    const item = fix(t, {
+      name: 'Untitled', category: 'General', shortDescription: '', description: '',
+      body: '', favorite: false, uses: 0, updatedAt: new Date().toISOString()
+    });
+    // Upgrade unchanged built-in examples so existing users see all three fields.
+    const example = SEED_FIELD_EXAMPLES[item.id];
+    if (example) {
+      if (!item.shortDescription) item.shortDescription = example.shortDescription;
+      if (!item.description) item.description = example.description;
+    }
+    return item;
+  });
   out.kb = out.kb.map((k) => fix(k, { number: '', title: '', url: '', notes: '', favorite: false, uses: 0, updatedAt: new Date().toISOString() }));
   out.emails = out.emails.map((e) => fix(e, { name: 'Untitled', subject: '', body: '', favorite: false, uses: 0, updatedAt: new Date().toISOString() }));
   out.kits = out.kits.map((k) => fix(k, { name: 'Untitled', blocks: [], uses: 0, createdAt: new Date().toISOString() }));
