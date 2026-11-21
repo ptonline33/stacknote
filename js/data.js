@@ -3,14 +3,15 @@
 export const STORAGE_KEY = 'stacknote:v1';
 
 export const BUILTIN_VARS = [
-  'ticket', 'caller', 'phone', 'shortdesc', 'kbnum', 'date', 'time', 'datetime',
-  'agent', 'kb', 'kblist'
+  'ticket', 'caller', 'phone', 'asset', 'shortdesc', 'kbnum', 'date', 'time',
+  'datetime', 'agent', 'kb', 'kblist'
 ];
 
 export const BUILTIN_VAR_HELP = {
   ticket: 'Ticket number (INC / REQ / RITM…)',
   caller: 'Caller / affected user name',
   phone: 'Caller phone / contact number (Ticket context)',
+  asset: 'Asset tag / device ID (Ticket context)',
   shortdesc: 'Short description of the ticket',
   kbnum: 'KB# typed into the quick-entry field (also merged into {{kb}})',
   date: 'Today\'s date',
@@ -158,7 +159,7 @@ export function seedState() {
   return {
     v: 1,
     settings: clone(DEFAULT_SETTINGS),
-    context: { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' },
+    context: { ticket: '', caller: '', phone: '', asset: '', shortdesc: '', kbnum: '' },
     fields: {},
     templates: [
       tpl('seed-tpl-pwreset', 'Password reset', 'Access',
@@ -218,11 +219,13 @@ export function seedState() {
 export function normalizeState(raw) {
   const base = seedState();
   if (!raw || typeof raw !== 'object') return base;
+  const rawFields = (raw.fields && typeof raw.fields === 'object' && !Array.isArray(raw.fields))
+    ? { ...raw.fields } : {};
   const out = {
     v: 1,
     settings: { ...clone(DEFAULT_SETTINGS), ...(raw.settings || {}) },
-    context: { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '', ...(raw.context || {}) },
-    fields: (raw.fields && typeof raw.fields === 'object' && !Array.isArray(raw.fields)) ? { ...raw.fields } : {},
+    context: { ticket: '', caller: '', phone: '', asset: '', shortdesc: '', kbnum: '', ...(raw.context || {}) },
+    fields: rawFields,
     templates: Array.isArray(raw.templates) ? raw.templates : base.templates,
     kb: Array.isArray(raw.kb) ? raw.kb : base.kb,
     emails: Array.isArray(raw.emails) ? raw.emails : base.emails,
@@ -231,6 +234,12 @@ export function normalizeState(raw) {
     history: Array.isArray(raw.history) ? raw.history : []
   };
   out.settings.supabase = { url: '', key: '', workspace: '', ...(raw.settings?.supabase || {}) };
+  // "{{asset}}" used to be an auto-detected custom field; it is now a built-in
+  // context field. Carry any previously entered value across.
+  if (out.fields.asset !== undefined) {
+    if (!out.context.asset) out.context.asset = String(out.fields.asset ?? '');
+    delete out.fields.asset;
+  }
   // Basic per-item defaults.
   const fix = (item, defaults) => ({ ...defaults, ...item });
   out.templates = out.templates.map((t) => {

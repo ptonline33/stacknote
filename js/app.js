@@ -232,6 +232,10 @@ function renderContext(fields) {
           <input class="input" id="ctx-phone" data-context="phone" value="${esc(c.phone || '')}" placeholder="+1 555 010 1234" autocomplete="off" inputmode="tel">
         </div>
         <div class="field">
+          <label for="ctx-asset">Asset tag <span class="muted">({{asset}})</span></label>
+          <input class="input" id="ctx-asset" data-context="asset" value="${esc(c.asset || '')}" placeholder="LT-4471 / AST0099888" autocomplete="off">
+        </div>
+        <div class="field">
           <label for="ctx-sd">Short description</label>
           <input class="input" id="ctx-sd" data-context="shortdesc" value="${esc(c.shortdesc || '')}" placeholder="Cannot sign in to VPN" autocomplete="off">
         </div>
@@ -1237,7 +1241,7 @@ async function doCopy(next = false) {
   if (next) {
     state.stack = [];
     if (state.settings.resetFieldsOnNext !== false) {
-      state.context = { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' };
+      state.context = { ticket: '', caller: '', phone: '', asset: '', shortdesc: '', kbnum: '' };
       state.fields = {};
     }
     toast('Copied — ready for the next ticket ✓', 'ok');
@@ -1346,7 +1350,7 @@ async function handleAction(action, d, el, opts = {}) {
       break;
     case 'context-toggle': ui.contextOpen = !ui.contextOpen; renderView(); break;
     case 'new-ticket':
-      state.context = { ticket: '', caller: '', phone: '', shortdesc: '', kbnum: '' };
+      state.context = { ticket: '', caller: '', phone: '', asset: '', shortdesc: '', kbnum: '' };
       state.fields = {};
       save(); renderView(); toast('Cleared for a new ticket');
       break;

@@ -59,6 +59,7 @@ export function buildVars(state) {
     ticket: state.context?.ticket || '',
     caller: state.context?.caller || '',
     phone: state.context?.phone || '',
+    asset: state.context?.asset || '',
     shortdesc: state.context?.shortdesc || '',
     date: d.toLocaleDateString(),
     time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -66,7 +67,9 @@ export function buildVars(state) {
     agent: settings.agent || ''
   };
   for (const [k, v] of Object.entries(state.fields || {})) {
-    base[String(k).toLowerCase()] = v ?? '';
+    const key = String(k).toLowerCase();
+    // Built-in context fields always take precedence over legacy custom fields.
+    if (!(key in base)) base[key] = v ?? '';
   }
 
   const kbItems = collectKB(state);

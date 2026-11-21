@@ -14,8 +14,8 @@ if you want it.
 ## The workflow
 
 1. **Fill the ticket context once** at the top (ticket number, caller, phone /
-   contact number, short description, **KB# quick entry**, your initials).
-   Every `{{placeholder}}` in every template updates live as you type.
+   contact number, **asset tag**, short description, **KB# quick entry**, your
+   initials). Every `{{placeholder}}` in every template updates live as you type.
 2. **Pick blocks** from the Library on the left:
    - **Notes** — templates with a Short description, Description and Work notes
    - **KB** — KB numbers you reference (several can be stacked; they render as
@@ -86,15 +86,17 @@ containing `KB: {{kb|N/A}}` picks it up automatically.
 
 ### Built-in variables
 
-`{{ticket}}` `{{caller}}` `{{phone}}` `{{shortdesc}}` `{{kbnum}}` `{{date}}`
-`{{time}}` `{{datetime}}` `{{agent}}` `{{kb}}` (comma-separated KB numbers,
-library + quick-entry) `{{kblist}}` (full KB block). KB line formats
+`{{ticket}}` `{{caller}}` `{{phone}}` `{{asset}}` `{{shortdesc}}` `{{kbnum}}`
+`{{date}}` `{{time}}` `{{datetime}}` `{{agent}}` `{{kb}}` (comma-separated KB
+numbers, library + quick-entry) `{{kblist}}` (full KB block). KB line formats
 additionally accept `{{number}}` `{{title}}` `{{url}}` `{{notes}}`.
 
-`{{phone}}` comes from the **Phone / contact number** field in Ticket context.
-It's optional — if a template doesn't use it, just leave the field blank. Use
+`{{phone}}` and `{{asset}}` come from the **Phone / contact number** and
+**Asset tag** fields in Ticket context. Both are optional — if a template
+doesn't use them, just leave the fields blank. Use `{{asset|the device}}` or
 `{{phone|N/A}}` when you want an explicit fallback in a template that does use
-it. Add it to any template with the `+ {{phone}}` chip in the editor.
+them. Add them to any template with the `+ {{asset}}` / `+ {{phone}}` chips in
+the editor.
 
 ---
 
