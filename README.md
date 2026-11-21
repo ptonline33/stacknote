@@ -13,9 +13,9 @@ if you want it.
 
 ## The workflow
 
-1. **Fill the ticket context once** at the top (ticket number, caller, short
-   description, your initials). Every `{{placeholder}}` in every template
-   updates live as you type.
+1. **Fill the ticket context once** at the top (ticket number, caller, phone /
+   contact number, short description, your initials). Every `{{placeholder}}`
+   in every template updates live as you type.
 2. **Pick blocks** from the Library on the left:
    - **Notes** — work notes / close-note templates
    - **KB** — KB numbers you reference (several can be stacked; they render as
@@ -33,7 +33,7 @@ if you want it.
 
 | Feature | What it does |
 | --- | --- |
-| **Command palette** (`Ctrl/⌘ + K`) | Fuzzy search every template, KB number, email, kit and action without leaving the keyboard. |
+| **Command palette** (`Ctrl/⌘ + K`) | Fuzzy search every template, KB number, email, kit and action. **Selecting one copies that item's content straight to the clipboard** (variables already filled) — hold **Shift** while selecting to add it to the stack instead. Configurable in Settings → Workflow. |
 | **Smart variables** | `{{ticket}}`, `{{caller}}`, `{{date}}`, `{{kb}}` … plus **any placeholder you invent**. Unknown ones (e.g. `{{hostname}}`) automatically become input fields in the context bar. Add a fallback with `{{ticket\|N/A}}`. |
 | **Quick Kits** | Save a whole stack (e.g. *Password reset + 2 KB articles + confirmation email*) and reload it in one click. Two examples are included. |
 | **Copy history** | Re-copy or reload anything you copied earlier today — handy when a ticket bounces back. |
@@ -46,18 +46,31 @@ if you want it.
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl/⌘ + K` | Command palette |
-| `Ctrl/⌘ + Enter` | Copy the whole note |
+| `Ctrl/⌘ + K` | Command palette — **selecting an item copies it to the clipboard** |
+| `Ctrl/⌘ + K` then `Shift + Enter` / `Shift + click` | Add that item to the stack instead of copying |
+| `Ctrl/⌘ + Enter` | Copy the whole composed note |
 | `Ctrl/⌘ + Shift + Enter` | Copy & start next ticket |
 | `/` | Focus library search |
 | `?` | Shortcuts guide |
 | `Esc` | Close dialog / palette |
 
+> **Palette behaviour** is set in **Settings → Workflow**: `Copy to clipboard`
+> (default), `Add to stack`, or `Copy AND add to stack`. Shift always does the
+> opposite action. Selecting a **Quick Kit** copies the fully composed note
+> from all of its blocks. Copying a template/email/KB fills variables from the
+> current Ticket context first, so `{{ticket}}` and `{{kb}}` are ready to paste.
+
 ### Built-in variables
 
-`{{ticket}}` `{{caller}}` `{{shortdesc}}` `{{date}}` `{{time}}` `{{datetime}}`
-`{{agent}}` `{{kb}}` (comma-separated KB numbers) `{{kblist}}` (full KB block).
-KB line formats additionally accept `{{number}}` `{{title}}` `{{url}}` `{{notes}}`.
+`{{ticket}}` `{{caller}}` `{{phone}}` `{{shortdesc}}` `{{date}}` `{{time}}`
+`{{datetime}}` `{{agent}}` `{{kb}}` (comma-separated KB numbers) `{{kblist}}`
+(full KB block). KB line formats additionally accept `{{number}}` `{{title}}`
+`{{url}}` `{{notes}}`.
+
+`{{phone}}` comes from the **Phone / contact number** field in Ticket context.
+It's optional — if a template doesn't use it, just leave the field blank. Use
+`{{phone|N/A}}` when you want an explicit fallback in a template that does use
+it. Add it to any template with the `+ {{phone}}` chip in the editor.
 
 ---
 

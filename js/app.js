@@ -222,6 +222,10 @@ function renderContext(fields) {
           <input class="input" id="ctx-caller" data-context="caller" value="${esc(c.caller || '')}" placeholder="Jane Doe" autocomplete="off">
         </div>
         <div class="field">
+          <label for="ctx-phone">Phone / contact number <span class="muted">({{phone}})</span></label>
+          <input class="input" id="ctx-phone" data-context="phone" value="${esc(c.phone || '')}" placeholder="+1 555 010 1234" autocomplete="off" inputmode="tel">
+        </div>
+        <div class="field">
           <label for="ctx-sd">Short description</label>
           <input class="input" id="ctx-sd" data-context="shortdesc" value="${esc(c.shortdesc || '')}" placeholder="Cannot sign in to VPN" autocomplete="off">
         </div>
@@ -632,6 +636,16 @@ function renderSettings() {
             <option value="alpha" ${s.sort === 'alpha' ? 'selected' : ''}>A–Z</option>
             <option value="recent" ${s.sort === 'recent' ? 'selected' : ''}>Recently edited</option>
           </select>
+        </div>
+        <hr class="divider">
+        <div class="field">
+          <label>${MOD} K — when I select a template / KB / email / kit</label>
+          <select class="select" data-setting="paletteMode">
+            <option value="copy" ${s.paletteMode === 'copy' ? 'selected' : ''}>Copy it to clipboard (recommended)</option>
+            <option value="stack" ${s.paletteMode === 'stack' ? 'selected' : ''}>Add it to the stack</option>
+            <option value="both" ${s.paletteMode === 'both' ? 'selected' : ''}>Copy AND add to stack</option>
+          </select>
+          <p class="hint" style="margin-top:6px">Variables like <code>{{ticket}}</code> are filled from Ticket context before copying. Hold <b>Shift</b> while clicking / pressing Enter to do the opposite action. Clicking items in the Library panel always adds to the stack.</p>
         </div>`)}
 
       ${settingPanel('Your data', `
@@ -669,14 +683,15 @@ function renderSettings() {
         <div class="preview-warn" style="margin-top:8px"><span>⚠</span><span>Supabase anon keys are public. Use a long random workspace code and don't store confidential data. See the README for a hardened, auth-based setup.</span></div>`)}
 
       ${settingPanel('Keyboard shortcuts', `
-        <div class="shortcut-row"><span>Command palette / quick find</span><span class="spacer"></span><span class="kbd">${MOD} K</span></div>
+        <div class="shortcut-row"><span>Quick find — <b>select copies that item</b></span><span class="spacer"></span><span class="kbd">${MOD} K</span></div>
+        <div class="shortcut-row"><span>…with Shift — add it to the stack instead</span><span class="spacer"></span><span class="kbd">${MOD} K ⇧ ↵</span></div>
         <div class="shortcut-row"><span>Copy the whole note</span><span class="spacer"></span><span class="kbd">${MOD} ↵</span></div>
         <div class="shortcut-row"><span>Copy &amp; start next ticket</span><span class="spacer"></span><span class="kbd">${MOD} ⇧ ↵</span></div>
         <div class="shortcut-row"><span>Focus library search</span><span class="spacer"></span><span class="kbd">/</span></div>
         <div class="shortcut-row"><span>Close dialog / palette</span><span class="spacer"></span><span class="kbd">Esc</span></div>
         <div class="shortcut-row"><span>This help</span><span class="spacer"></span><span class="kbd">?</span></div>
         <hr class="divider">
-        <p class="hint">Tip: type <code>{{ticket}}</code> in any template and it fills from Ticket context. Unknown placeholders like <code>{{hostname}}</code> automatically appear as fields above the builder.</p>
+        <p class="hint">Tip: type <code>{{ticket}}</code> in any template and it fills from Ticket context before copying. Unknown placeholders like <code>{{hostname}}</code> automatically appear as fields above the builder. Palette behaviour is configurable in the Workflow panel.</p>
         <button class="btn btn-sm" data-action="shortcuts" style="margin-top:10px">Open shortcuts guide</button>`)}
     </div>`;
 }
@@ -895,7 +910,7 @@ function showShortcuts() {
     body: `
       <p class="hint">A few habits that make ticket notes almost instant:</p>
       <div class="shortcut-row"><span><b>${MOD} K</b> — command palette</span><span class="spacer"></span><span class="kbd">${MOD} K</span></div>
-      <p class="hint" style="margin:0 0 12px">Type a few letters of any template, KB number, email, kit or action and hit Enter. You never have to leave the keyboard.</p>
+      <p class="hint" style="margin:0 0 12px">Type a few letters of any template, KB number, email, kit or action and hit Enter — the item's content is <b>copied to your clipboard immediately</b>, with variables already filled. Hold <b>Shift</b> while selecting to add it to the stack instead. Change this in Settings → Workflow.</p>
       <div class="shortcut-row"><span><b>Quick Kits</b> — one click for a whole ticket type</span></div>
       <p class="hint" style="margin:0 0 12px">Save a stack (e.g. Password reset + KB + confirmation email) as a Kit, then load it instantly.</p>
       <div class="shortcut-row"><span><b>Smart variables</b></span></div>
@@ -975,6 +990,11 @@ function paletteItems() {
     .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
 }
 
+function paletteModeHint() {
+  const mode = state.settings.paletteMode || 'copy';
+  return mode === 'copy' ? 'copy' : mode === 'stack' ? '+ stack' : 'copy + stack';
+}
+
 function renderPaletteResults() {
   const el = $('#palette-results');
   if (!el) return;
@@ -985,20 +1005,25 @@ function renderPaletteResults() {
     el.innerHTML = '<div class="empty">No matches. Try a template name, KB number or action.</div>';
     return;
   }
+  const hint = paletteModeHint();
   let lastGroup = '';
   el.innerHTML = items.map((it, i) => {
     let head = '';
     if (it.group !== lastGroup) { head = `<div class="palette-group">${esc(it.group)}</div>`; lastGroup = it.group; }
+    const isItem = it.payload.type === 'add' || it.payload.type === 'load-kit';
     return `${head}<div class="palette-item ${i === ui.palette.selected ? 'sel' : ''}" data-action="palette-item" data-index="${i}">
       <span class="pi-icon">${esc(it.icon)}</span>
       <span class="pi-main"><span class="pi-name">${esc(it.name)} ${it.extra ? `<span style="color:var(--warn)">${esc(it.extra)}</span>` : ''}</span>
         <span class="pi-sub">${esc(it.sub || '')}</span></span>
-      <span class="pi-hint">${i === ui.palette.selected ? '↵' : ''}</span>
+      <span class="pi-hint">${i === ui.palette.selected ? '↵ ' : ''}${isItem ? esc(hint) : 'run'}</span>
     </div>`;
   }).join('');
 }
 
 function renderPalette() {
+  const mode = state.settings.paletteMode || 'copy';
+  const primary = mode === 'copy' ? 'copy' : mode === 'stack' ? 'add to stack' : 'copy + add';
+  const secondary = mode === 'stack' ? 'copy' : 'add to stack';
   $('#palette-root').innerHTML = `
     <div class="palette-backdrop" data-action="palette-backdrop">
       <div class="palette" role="dialog" aria-modal="true" aria-label="Quick find">
@@ -1007,7 +1032,7 @@ function renderPalette() {
           <input class="input" data-palette-input placeholder="${ui.palette.mode === 'all' ? 'Search templates, KB, emails, kits, actions…' : 'Search KB articles…'}" autocomplete="off">
         </div>
         <div class="palette-results" id="palette-results"></div>
-        <div class="palette-foot"><span>↑↓ navigate</span><span>↵ select</span><span>Esc close</span><span style="margin-left:auto">${MOD} K</span></div>
+        <div class="palette-foot"><span>↑↓ navigate</span><span>↵ ${primary}</span><span>⇧ + select → ${secondary}</span><span>Esc close</span><span style="margin-left:auto">${MOD} K</span></div>
       </div>
     </div>`;
   renderPaletteResults();
@@ -1025,12 +1050,38 @@ function closePalette() {
   ui.palette = null;
 }
 
-function runPaletteItem(item) {
+async function runPaletteItem(item, shift = false) {
   const p = item.payload;
   closePalette();
-  if (p.type === 'add') addBlock(p.kind, p.id);
-  else if (p.type === 'load-kit') loadKit(p.id);
-  else if (p.type === 'action') handleAction(p.action, p, null);
+
+  if (p.type === 'action') {
+    await handleAction(p.action, p, null, {});
+    renderView();
+    return;
+  }
+
+  let mode = state.settings.paletteMode || 'copy';
+  if (shift) mode = mode === 'stack' ? 'copy' : 'stack';
+  const doCopy = mode === 'copy' || mode === 'both';
+  const doStack = mode === 'stack' || mode === 'both';
+
+  let copied = false;
+  if (doCopy) {
+    const kind = p.type === 'load-kit' ? 'kit' : p.kind;
+    const text = itemCopyText(kind, p.id);
+    if (!text || !text.trim()) toast('That item is empty — nothing copied.', 'err');
+    else {
+      copied = await copyText(text);
+      if (!copied) toast('Clipboard was blocked by the browser.', 'err');
+    }
+  }
+
+  if (doStack) {
+    if (p.type === 'load-kit') loadKit(p.id);
+    else addBlock(p.kind, p.id);
+  }
+
+  if (copied) toast(`Copied “${item.name}”${doStack ? ' & added to stack' : ''} ✓`, 'ok');
   renderView();
 }
 
@@ -1128,7 +1179,7 @@ async function doCopy(next = false) {
   if (next) {
     state.stack = [];
     if (state.settings.resetFieldsOnNext !== false) {
-      state.context = { ticket: '', caller: '', shortdesc: '' };
+      state.context = { ticket: '', caller: '', phone: '', shortdesc: '' };
       state.fields = {};
     }
     toast('Copied — ready for the next ticket ✓', 'ok');
@@ -1145,6 +1196,11 @@ async function doCopy(next = false) {
 function itemCopyText(kind, id) {
   const it = findItem(state, kind, id);
   if (!it) return '';
+  if (kind === 'kit') {
+    // A kit copies the fully composed note of all its blocks with current variables.
+    const temp = { ...state, stack: clone(it.blocks || []) };
+    return compose(temp).text.trim();
+  }
   const vars = buildVars(state);
   const unfilled = new Set();
   if (kind === 'template') return resolve(it.body, vars, unfilled).trim();
@@ -1218,7 +1274,7 @@ function syncUrl() {
 /* Central action dispatcher                                           */
 /* ------------------------------------------------------------------ */
 
-async function handleAction(action, d, el) {
+async function handleAction(action, d, el, opts = {}) {
   switch (action) {
     case 'tab':
       ui.tab = d.tab; syncUrl(); renderView();
@@ -1232,7 +1288,7 @@ async function handleAction(action, d, el) {
       break;
     case 'context-toggle': ui.contextOpen = !ui.contextOpen; renderView(); break;
     case 'new-ticket':
-      state.context = { ticket: '', caller: '', shortdesc: '' };
+      state.context = { ticket: '', caller: '', phone: '', shortdesc: '' };
       state.fields = {};
       save(); renderView(); toast('Cleared for a new ticket');
       break;
@@ -1251,7 +1307,7 @@ async function handleAction(action, d, el) {
     case 'palette': openPalette(d.mode || 'all'); break;
     case 'palette-item': {
       const it = ui.palette?.items?.[Number(d.index)];
-      if (it) runPaletteItem(it);
+      if (it) runPaletteItem(it, opts.shift);
       break;
     }
     case 'palette-backdrop': closePalette(); break;
@@ -1449,7 +1505,7 @@ document.addEventListener('click', (e) => {
     if (e.target !== el) return;
   }
   if (el.tagName === 'BUTTON' || el.tagName === 'A') e.preventDefault();
-  handleAction(action, el.dataset, el);
+  handleAction(action, el.dataset, el, { shift: e.shiftKey });
 });
 
 document.addEventListener('focusin', (e) => {
@@ -1527,7 +1583,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const it = ui.palette.items?.[ui.palette.selected];
-      if (it) runPaletteItem(it);
+      if (it) runPaletteItem(it, e.shiftKey);
       return;
     }
     return;

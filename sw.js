@@ -1,6 +1,6 @@
 // StackNote service worker — network-first with an offline cache.
 // Bump CACHE whenever a deployment ships changed files so stale caches are purged.
-const CACHE = 'stacknote-v1';
+const CACHE = 'stacknote-v3';
 
 const PRECACHE = [
   './',

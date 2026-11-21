@@ -199,6 +199,7 @@ button { cursor: pointer; }
 /* ---------- Form controls ---------- */
 .field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .field > label, .lbl { font-size: 11px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.field > label .muted { text-transform: none; letter-spacing: normal; font-weight: 500; }
 .input, .textarea, .select {
   width: 100%; padding: 9px 11px; border-radius: var(--r-sm);
   border: 1px solid var(--border-2); background: var(--bg-2); color: var(--text);
@@ -226,8 +227,8 @@ html[data-theme="light"] .input, html[data-theme="light"] .textarea, html[data-t
 }
 .context-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
 .context-head h2 { font-size: 13.5px; }
-.context-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 14px; }
-.context-extras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 14px 14px; }
+.context-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 12px; padding: 14px; }
+.context-extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 12px; padding: 0 14px 14px; }
 .context-extra-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--accent); font-weight: 650; }
 
 .builder-grid { display: grid; grid-template-columns: 300px minmax(340px, 1fr) 380px; gap: 14px; align-items: start; }

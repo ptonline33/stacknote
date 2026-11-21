@@ -39,6 +39,7 @@ export function buildVars(state) {
   const base = {
     ticket: state.context?.ticket || '',
     caller: state.context?.caller || '',
+    phone: state.context?.phone || '',
     shortdesc: state.context?.shortdesc || '',
     date: d.toLocaleDateString(),
     time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

@@ -3,13 +3,14 @@
 export const STORAGE_KEY = 'stacknote:v1';
 
 export const BUILTIN_VARS = [
-  'ticket', 'caller', 'shortdesc', 'date', 'time', 'datetime',
+  'ticket', 'caller', 'phone', 'shortdesc', 'date', 'time', 'datetime',
   'agent', 'kb', 'kblist'
 ];
 
 export const BUILTIN_VAR_HELP = {
   ticket: 'Ticket number (INC / REQ / RITM…)',
   caller: 'Caller / affected user name',
+  phone: 'Caller phone / contact number (Ticket context)',
   shortdesc: 'Short description of the ticket',
   date: 'Today\'s date',
   time: 'Current time',
@@ -71,6 +72,7 @@ export const DEFAULT_SETTINGS = {
   kbFormat: '• {{number}} — {{title}}',
   autoClear: false,              // clear stack after a normal copy
   resetFieldsOnNext: true,       // "Copy & next" clears context + custom fields
+  paletteMode: 'copy',           // 'copy' | 'stack' | 'both' — what selecting a palette item does
   historyLimit: 100,
   sort: 'used',                  // 'used' | 'alpha' | 'recent'
   supabase: { url: '', key: '', workspace: '' },
@@ -97,7 +99,7 @@ export function seedState() {
   return {
     v: 1,
     settings: clone(DEFAULT_SETTINGS),
-    context: { ticket: '', caller: '', shortdesc: '' },
+    context: { ticket: '', caller: '', phone: '', shortdesc: '' },
     fields: {},
     templates: [
       tpl('seed-tpl-pwreset', 'Password reset', 'Access',
@@ -160,7 +162,7 @@ export function normalizeState(raw) {
   const out = {
     v: 1,
     settings: { ...clone(DEFAULT_SETTINGS), ...(raw.settings || {}) },
-    context: { ticket: '', caller: '', shortdesc: '', ...(raw.context || {}) },
+    context: { ticket: '', caller: '', phone: '', shortdesc: '', ...(raw.context || {}) },
     fields: (raw.fields && typeof raw.fields === 'object' && !Array.isArray(raw.fields)) ? { ...raw.fields } : {},
     templates: Array.isArray(raw.templates) ? raw.templates : base.templates,
     kb: Array.isArray(raw.kb) ? raw.kb : base.kb,
